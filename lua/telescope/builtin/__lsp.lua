@@ -146,10 +146,25 @@ end
 local function list_or_jump(action, title, opts)
   local params = vim.lsp.util.make_position_params(opts.winnr)
   vim.lsp.buf_request(opts.bufnr, action, params, function(err, result, ctx, _)
+    local client = vim.lsp.get_client_by_id(ctx.client_id)
+
+    if not client then
+      return
+    end
+
+    if client.handlers and client.handlers[action] then
+      client.handlers[action](err, result, ctx, _)
+
+      if not result or result.processed then
+        return
+      end
+    end
+
     if err then
       vim.api.nvim_err_writeln("Error when executing " .. action .. " : " .. err.message)
       return
     end
+
     local flattened_results = {}
     if result then
       -- textDocument/definition can return Location or Location[]
@@ -160,7 +175,7 @@ local function list_or_jump(action, title, opts)
       vim.list_extend(flattened_results, result)
     end
 
-    local offset_encoding = vim.lsp.get_client_by_id(ctx.client_id).offset_encoding
+    local offset_encoding = client.offset_encoding
 
     if #flattened_results == 0 then
       return
